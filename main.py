@@ -17,9 +17,10 @@ class Train:
     - To find a specific car, we must walk through from the engine
     - Adding/removing cars involves changing the couplings (pointers)
     - The train can grow and shrink dynamically
+    - We track both engine (head) and caboose (tail) for efficiency
 
     Time Complexities:
-    - add_car (append): O(n) - must walk to the end
+    - add_car (append): O(1) - we have direct access to the tail
     - insert_car: O(n) - must walk to insertion point
     - get_cargo: O(n) - must walk to the position
     - remove_car: O(n) - must walk to removal point
@@ -30,31 +31,29 @@ class Train:
     def __init__(self):
         """Initialize an empty train (no cars yet)"""
         self.engine = None    # The front of the train (head pointer)
+        self.caboose = None   # The last car of the train (tail pointer)
         self.car_count = 0    # Track number of cars for O(1) size access
 
     def add_car(self, cargo):
         """
         Add a new car to the end of the train.
 
-        Algorithm: Linear Traversal
+        Algorithm: Direct Tail Access - O(1)
         1. Create new train car
-        2. If train is empty, make it the engine car
-        3. Otherwise, walk to the last car
-        4. Attach new car to the last car
+        2. If train is empty, make it both engine and caboose
+        3. Otherwise, attach to caboose and update caboose pointer
         """
         new_car = TrainCar(cargo)
 
         # Edge case: empty train
         if self.engine is None:
             self.engine = new_car
+            self.caboose = new_car
         else:
-            # Traverse to find the last car
-            current_car = self.engine
-            while current_car.next_car is not None:
-                current_car = current_car.next_car
-
-            # Attach the new car
-            current_car.next_car = new_car
+            # Attach to the current caboose
+            self.caboose.next_car = new_car
+            # Update caboose to point to the new last car
+            self.caboose = new_car
 
         self.car_count += 1
 
@@ -65,11 +64,17 @@ class Train:
         Algorithm: Insertion with Pointer Manipulation
         1. Validate position
         2. Handle special case: inserting at front
-        3. Otherwise, walk to the car BEFORE insertion point
-        4. Decouple, insert new car, recouple
+        3. Handle special case: inserting at end (use add_car)
+        4. Otherwise, walk to the car BEFORE insertion point
+        5. Decouple, insert new car, recouple
         """
         if car_number < 0 or car_number > self.car_count:
             raise IndexError(f"Can't insert car at position {car_number}!")
+
+        # Special case: inserting at the end
+        if car_number == self.car_count:
+            self.add_car(cargo)
+            return
 
         new_car = TrainCar(cargo)
 
@@ -77,6 +82,9 @@ class Train:
         if car_number == 0:
             new_car.next_car = self.engine
             self.engine = new_car
+            # If this was the only car, update caboose too
+            if self.car_count == 0:
+                self.caboose = new_car
         else:
             # Walk to the car BEFORE where we want to insert
             current_car = self.engine
@@ -117,12 +125,18 @@ class Train:
         2. Handle special case: removing engine car
         3. Otherwise, walk to car BEFORE the one to remove
         4. Decouple the car by skipping over it
+        5. Update caboose if we removed the last car
         """
         if car_number < 0 or car_number >= self.car_count:
             raise IndexError(f"No car to remove at position {car_number}!")
 
+        # Special case: removing the only car
+        if self.car_count == 1:
+            removed_cargo = self.engine.cargo
+            self.engine = None
+            self.caboose = None
         # Special case: removing the engine car
-        if car_number == 0:
+        elif car_number == 0:
             removed_cargo = self.engine.cargo
             self.engine = self.engine.next_car
         else:
@@ -134,6 +148,10 @@ class Train:
             # Decouple: skip over the car to remove
             removed_cargo = current_car.next_car.cargo
             current_car.next_car = current_car.next_car.next_car
+
+            # Update caboose if we removed the last car
+            if current_car.next_car is None:
+                self.caboose = current_car
 
         self.car_count -= 1
         return removed_cargo
@@ -188,7 +206,6 @@ class Train:
             yield current_car.cargo
             current_car = current_car.next_car
 
-
 # LinkedList Project Reflection Notes
 #
 # # Reflections on challenges faced and how they were resolved.
@@ -197,7 +214,8 @@ class Train:
 # - Understanding pointers - kept thinking of them as "containing" the next node instead of "pointing to" it
 # - Off-by-one errors in insert/remove - wasn't sure when to stop at car_number vs car_number-1
 # - Visualizing pointer manipulation - drawing the before/after states helped immensely
-# - Why LinkedList when arrays exist - had to understand the trade-offs
+# - Why Linked List when arrays exist - had to understand the trade-offs
+# - Forgetting to include a caboose in to include a reference to the tail of the linked-list.
 #
 # Why was I stuck?
 # - Mental model issue - kept thinking sequentially like arrays instead of connections
@@ -210,6 +228,7 @@ class Train:
 # - Drawing diagrams - visualizing pointer changes step by step
 # - Understanding that we need the node BEFORE for most operations
 # - Edge case patterns - first node is always special, last node has next=None
+# - Peer insight to remind me the tail needed a pointer as well.
 #
 # How did I know I needed that information?
 # - Segmentation faults and None errors showed I was accessing non-existent nodes
